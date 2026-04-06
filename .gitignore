@@ -1,9 +1,11 @@
-/dataset/thumbs
+
+
 /openpose-1.7.0-binaries-win64-gpu-python3.7-flir-3d_recommended
 /shared/__pycache__
 /estimation-model/__pycache__
 /database/__pycache__
 *.json
-/estimation-model/outputs/HRnet
 *.pyc
 .env
+database/fyp_database.egg-info/
+shared/fyp_shared.egg-info/
