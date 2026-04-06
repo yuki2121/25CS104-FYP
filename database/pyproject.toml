@@ -1,0 +1,8 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "fyp-database"
+version = "0.0.1"
+dependencies = []

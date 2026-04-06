@@ -1,0 +1,25 @@
+
+.bg-blue-500 {
+    background-color: #5686d4;
+}
+.text-white {
+    color: #ffffff;
+}
+.hover\:bg-purple-600:hover {
+    background-color: #4c4adb;
+}
+.m-2 {
+    margin: 0.1rem;
+}
+.focus\:outline-none:focus {
+    outline: none;
+}
+
+.focus\:ring-2:focus {
+    box-shadow: 0 0 0 2px rgba(5, 82, 146, 0.5);
+}
+
+.bg-green-500 {
+    background-color: #3ebd8e;
+}
+
