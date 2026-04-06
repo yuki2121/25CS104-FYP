@@ -5,9 +5,10 @@ import numpy as np
 import torch
 from torch.utils.data import Dataset
 from normalization import select_17_joints,root_center_2d,root_center_3d,normalize_scale_with_factor, h36m_to_coco18
-
+from dotenv import load_dotenv
 import cdflib
 
+load_dotenv()
 
 class Pose2DDataset(Dataset):
     def __init__(self, json_paths, conf_thr= 0.3, min_valid_joints=6, prefilter=True):
@@ -327,8 +328,8 @@ def load_h36m_coco_dataset(root_dir, subjects):
 
 
 if __name__ == "__main__":
-
-    txt_path = "estimation-model/model/sample_path/filtered_10_percent_train_json_paths.txt"
+    KINETIC_10PER_FULLPOSE_TRAIN_PATH = os.getenv("KINETIC_10PER_FULLPOSE_TRAIN_PATH")
+    txt_path = KINETIC_10PER_FULLPOSE_TRAIN_PATH
 
     dataset = load_kinetic_dataset(txt_path, conf_thr=0.3, min_valid_joints=6)
     audit_dataset(dataset)

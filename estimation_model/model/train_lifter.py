@@ -6,65 +6,25 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torch.utils.data import Dataset, DataLoader
 
-from dataset import Pose2DDataset, load_kinetic_dataset, Human36MPairDataset
+from dataset import load_kinetic_dataset, load_h36m_dataset, load_h36m_coco_dataset
 from lifter import LifterMLP
 from geometry import apply_rotation, orthographic_projection, random_rotation_matrix
 from losses import masked_mse_2d, masked_mse_3d,masked_huber_2d, fix_denominstor_total_err_2d, fix_denominstor_total_err_3d, bone_length_loss, z_regularizer, bone_mean_anchor_loss, symmetry_loss, bone_len_consistency_loss, dis_hinge_loss, gen_hinge_loss, depth_variance_loss
 from occlusion import random_drop_mask
 from discriminator import Discriminator2D
 from normalization import normalize_coco18_torch
+from shared.keypoints_order import COCO18_EDGES, H36M17_EDGES, SYMMETRY_PAIRS, H36M17_SYMMETRY_PAIRS
+from dotenv import load_dotenv
 
+load_dotenv()
 
-COCO18_EDGES = [
-    (0, 1),
-    (1, 2), (2, 3), (3, 4),
-    (1, 5), (5, 6), (6, 7),
-    (1, 8), (8, 9), (9, 10),
-    (1, 11), (11, 12), (12, 13),
-    (0, 14), (0, 15),
-    (14, 16), (15, 17),
-]
-
-H36M17_EDGES = [
-    (0, 1), (1, 2), (2, 3),    # Right Leg
-    (0, 4), (4, 5), (5, 6),    # Left Leg
-    (0, 7), (7, 8), (8, 9), (9, 10), # Torso & Head
-    (8, 11), (11, 12), (12, 13), # Left Arm
-    (8, 14), (14, 15), (15, 16)  # Right Arm
-]
-
-
-SYMMETRY_PAIRS = [
-    ((2,3), (5,6)),   
-    ((3,4), (6,7)),   
-    ((8,9), (11,12)), 
-    ((9,10),(12,13)), 
-]
-
-H36M17_SYMMETRY_PAIRS = [
-    ((0, 4),   (0, 1)),     # Hips (Center to Left-Hip vs Center to Right-Hip)
-    ((4, 5),   (1, 2)),     # Thighs (L-Hip-Knee vs R-Hip-Knee)
-    ((5, 6),   (2, 3)),     # Calves (L-Knee-Ankle vs R-Knee-Ankle)
-    ((8, 11),  (8, 14)),    # Shoulders (Thorax to L-Shou vs Thorax to R-Shou)
-    ((11, 12), (14, 15)),   # Upper Arms (L-Shou-Elbow vs R-Shou-Elbow)
-    ((12, 13), (15, 16)),   # Forearms (L-Elbow-Wrist vs R-Elbow-Wrist)
-]
-
-# dataset
-
-def load_kinetic_dataset(txt_path):
-    dataset = load_kinetic_dataset(txt_path)
-    print(f"Dataset loaded with {len(dataset)} samples.")
-    return dataset
+output_dir = os.getenv("KINETIC_CKPT_DIR") or None
+train_txt_path = os.getenv("KINETIC_10PER_TRAIN_PATH")
+val_txt_path = os.getenv("KINETIC_10PER_VAL_PATH")
+H36M_DIR = os.getenv("H36M_DIR")
 
 TRAIN_SUBJECTS = ["S1", "S5", "S6", "S7", "S8"]
 TEST_SUBJECTS = ["S9", "S11"]
-
-def load_h36m_dataset(root_dir, subjects):
-    dataset = Human36MPairDataset(root_dir, subjects)
-    print(f"H36M Dataset loaded with {len(dataset)} samples.")
-    return dataset
-
 
 def eval_batch(lifter, norm_keypoints, scores, mask, root_type,scale, device,R= None):
     # 1. lift
@@ -105,10 +65,10 @@ def train_lifter(train_txt_path, val_txt_path, num_epochs=50, learning_rate_g=2e
         val_dataloader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False, num_workers=4)
     else:
         print("Training on Human36M with root-centered normalization.")
-        train_dataset = load_h36m_dataset("/mnt/e/BaiduNetdiskDownload/human3.6m", TRAIN_SUBJECTS)
+        train_dataset = load_h36m_dataset(H36M_DIR, TRAIN_SUBJECTS)
         train_dataloader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True, num_workers=4)
 
-        val_dataset = load_h36m_dataset("/mnt/e/BaiduNetdiskDownload/human3.6m", TEST_SUBJECTS)
+        val_dataset = load_h36m_dataset(H36M_DIR, TEST_SUBJECTS)
         val_dataloader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False, num_workers=4)
 
 
@@ -327,9 +287,9 @@ def train_lifter(train_txt_path, val_txt_path, num_epochs=50, learning_rate_g=2e
 
         # save epoch model
         if dataset_human36m:
-            epoch_model_path = Path(f"/mnt/h/Github/fyp/estimation-model/human36m/lifter_epoch_{epoch+1}.pth")
+            epoch_model_path = Path(f"{output_dir}/human36m/lifter_epoch_{epoch+1}.pth")
         else:
-            epoch_model_path = Path(f"/mnt/h/Github/fyp/estimation-model/lifter_epoch_{epoch+1}.pth")
+            epoch_model_path = Path(f"{output_dir}/lifter_epoch_{epoch+1}.pth")
         if (avg_val_2d_loss + avg_val_3d_loss) < best_val_loss:
             epoch_without_improve = 0
             best_val_loss = avg_val_2d_loss + avg_val_3d_loss
@@ -346,6 +306,6 @@ def train_lifter(train_txt_path, val_txt_path, num_epochs=50, learning_rate_g=2e
         
 
 if __name__ == "__main__":
-    train_txt_path = "estimation-model/model/sample_path/filtered_10_percent_train_json_paths.txt"
-    val_txt_path = "estimation-model/model/sample_path/filtered_10_percent_val_json_paths.txt"
+    train_txt_path = os.getenv("KINETIC_10PER_TRAIN_PATH")
+    val_txt_path = os.getenv("KINETIC_10PER_VAL_PATH")
     train_lifter(train_txt_path, val_txt_path, dataset_human36m=True)
