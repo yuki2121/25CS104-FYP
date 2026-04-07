@@ -44,8 +44,8 @@ lifter_checkpoint,
 output_dir,
 denoiser_checkpoint=None,
 num_epochs=200, 
-learning_rate=5e-4, 
-batch_size=2048, 
+learning_rate=1e-7, 
+batch_size=1024, 
 
 T = 100,
 conf_thr=0.3,
@@ -54,19 +54,19 @@ seed = 42,
 grad_clip=1.0,
 
 # weight for loss
-lambda_eps=2,
-lambda_reproj=5,
-lambda_bone=10,
-lambda_sym= 5,
-lambda_depth_var=5,
+lambda_eps=9.93,
+lambda_reproj=8.34,
+lambda_bone=9.76,
+lambda_sym= 1.06,
+lambda_depth_var=3.10,
 # random drop joint
 drop_rate=0.3, 
-clamp_known = True,
+clamp_known = False,
 dataset_human36m=False,
-c = 5,
+c = 9.58,
 is_optuna=False,
 optuna_trial_num=None,
-target_std = 0.2
+target_std = 0.98
 ):
     
     os.makedirs(output_dir, exist_ok=True)
@@ -132,7 +132,7 @@ target_std = 0.2
     best_val_loss = float('inf')
     best_val_mpjpe = float('inf')
     epoch_without_improve = 0
-    stopping_patience = 5
+    stopping_patience = 10
 
     print(f"Using device: {device}")
 
@@ -180,18 +180,19 @@ target_std = 0.2
             B = x3d.shape[0]
             t = torch.randint(low=0, high=T, size=(B,), device=device, dtype=torch.long)
 
-            with torch.amp.autocast('cuda'):            
+                      
 
-                # add noise
-                x_t, noise = diffusion.q_sample(x3d, t)
-                if dataset_human36m:
-                    x_t = x_t - x_t[:, :1, :]
-                else:
-                    x_t = root_center_coco18(x_t)
-                drop_x2d = x2d * drop_mask.unsqueeze(-1)  # zero out dropped joints in 2D input
-                drop_scores = scores * drop_mask  # zero out dropped joints in scores
-                noise_pred = denoiser(x_t, drop_x2d, drop_scores, drop_mask, t, root_type)
+            # add noise
+            x_t, noise = diffusion.q_sample(x3d, t)
+            if dataset_human36m:
+                x_t = x_t - x_t[:, :1, :]
+            else:
+                x_t = root_center_coco18(x_t)
+            drop_x2d = x2d * drop_mask.unsqueeze(-1)  # zero out dropped joints in 2D input
+            drop_scores = scores * drop_mask  # zero out dropped joints in scores
+            noise_pred = denoiser(x_t, drop_x2d, drop_scores, drop_mask, t, root_type)
 
+            with torch.amp.autocast('cuda'):  
                 # noise loss
                 loss_eps = eps_loss(noise_pred=noise_pred, noise_true=noise, scores=drop_scores, conf_thr=conf_thr, power=1.0, mask=drop_mask, missing_weight=1.0, visible_weight=0.2)
 
@@ -202,16 +203,19 @@ target_std = 0.2
                 else:
                     x3d_hat = root_center_coco18(x3d_hat)
 
+
                 # clamp known joints 
                 if clamp_known:
                     x3d_hat = clamp_known_joints(x3d_hat, x3d, drop_mask)
 
                 # projection loss
                 x2d_hat = perspective_projection(x3d_hat, c=c)
+                
                 if dataset_human36m:
                     x2d_hat = x2d_hat - x2d_hat[:, :1, :]
                 else:
                     x2d_hat, root_type,_,_ = normalize_coco18_torch(x2d_hat, scores, drop_mask, conf_thr=conf_thr)
+                    
 
                 loss_reproj = masked_huber_2d(x2d_hat, x2d, drop_mask)
 
@@ -222,6 +226,7 @@ target_std = 0.2
 
 
                 loss = lambda_eps * loss_eps + lambda_reproj * loss_reproj + lambda_bone * loss_bone + lambda_sym * loss_sym  + lambda_depth_var * loss_depth_var
+                
 
             if is_train:
                 optimizer.zero_grad()
@@ -320,7 +325,7 @@ target_std = 0.2
 
 
 if __name__ == "__main__":
-    train_txt_path = os.getenv("KINETIC_10PER_FULLPOSE_TRAIN_PATH")
+    train_txt_path = os.getenv("KINETIC_50PER_FULLPOSE_TRAIN_PATH")
     val_txt_path = os.getenv("KINETIC_10PER_FULLPOSE_VAL_PATH")
     lifter_checkpoint=LIFTER_CKPT
     output_dir = KINETIC_CKPT_DIR
@@ -332,6 +337,6 @@ if __name__ == "__main__":
         lifter_checkpoint=lifter_checkpoint, 
         denoiser_checkpoint=denoiser_checkpoint,
         output_dir=output_dir, 
-        dataset_human36m=True)
+        dataset_human36m=False)
 
        
