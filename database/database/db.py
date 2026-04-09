@@ -5,22 +5,13 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-DATABASE_NAME = os.getenv("DATABASE_NAME")
-DATABASE_USER = os.getenv("DATABASE_USER")
-DATABASE_PASSWORD = os.getenv("DATABASE_PASSWORD")
-DATABASE_HOST = os.getenv("DATABASE_HOST")
-DATABASE_PORT = os.getenv("DATABASE_PORT")
+DATABASE_URL = os.getenv("DATABASE_URL")
+
 
 
 class DBManager:
-    def __init__(self, db_name=DATABASE_NAME, user=DATABASE_USER, password=DATABASE_PASSWORD, host=DATABASE_HOST, port=DATABASE_PORT):
-        self.conn = psycopg2.connect(
-            dbname=db_name,
-            user=user,
-            password=password,
-            host=host,
-            port=port
-        )
+    def __init__(self, dsn: str):
+        self.conn = psycopg2.connect(dsn=dsn)
         self.cursor = self.conn.cursor()
 
     def commit(self):
@@ -32,8 +23,8 @@ class DBManager:
 
     def rollback(self):
         self.conn.rollback()
-# TODO: add sql file too (restructure and obsolete 2d?)
-db_manager = DBManager()
+
+db_manager = DBManager(DATABASE_URL)
 
 def insert_image(path):
     query = "INSERT INTO image (path) VALUES (%s) ON CONFLICT (path) DO NOTHING;"
@@ -100,12 +91,11 @@ def get_result(vec, limit=20, offset=0):
     query = """
     SELECT
         p.poses_id,
-        p3d.pose_vec <=> (%s)::vector AS dist,
+        p.pose_vec <=> (%s)::vector AS dist,
         i.path,
         p.bbox_top_x, p.bbox_top_y, p.bbox_bottom_x, p.bbox_bottom_y
-        FROM poses_2d p, image i, poses_3d p3d
+        FROM poses p, image i
         WHERE p.image_id = i.image_id
-        and p.poses_id = p3d.pose_2d_id
         ORDER BY dist
         LIMIT %s OFFSET %s;
     """
