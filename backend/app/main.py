@@ -11,6 +11,7 @@ from fastapi.responses import StreamingResponse
 from google.cloud import storage
 import os
 from dotenv import load_dotenv
+from google.api_core.exceptions import NotFound
 
 import io
 import mimetypes
@@ -52,10 +53,19 @@ def get_image(object_path: str):
     bucket = storage_client.bucket(GCS_BUCKET)
     blob = bucket.blob(object_path)
 
-    if not blob.exists():
+    try:
+        data = blob.download_as_bytes()
+    except NotFound:
         raise HTTPException(status_code=404, detail="Image not found")
 
-    data = blob.download_as_bytes()
-    content_type = blob.content_type or mimetypes.guess_type(object_path)[0] or "application/octet-stream"
+    content_type = (
+        blob.content_type
+        or mimetypes.guess_type(object_path)[0]
+        or "application/octet-stream"
+    )
 
-    return StreamingResponse(io.BytesIO(data), media_type=content_type)
+    return StreamingResponse(
+        io.BytesIO(data),
+        media_type=content_type,
+        headers={"Cache-Control": "public, max-age=3600"},
+    )
