@@ -31,6 +31,8 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+GCS_BUCKET = os.getenv("GCS_BUCKET")
+storage_client = storage.Client()
 
 @app.get("/api/health")
 def health():
