@@ -2,7 +2,7 @@ import psycopg2
 import json
 import os
 from dotenv import load_dotenv
-from storage_signer import sign_image_url
+from .storage_signer import sign_image_url
 
 load_dotenv()
 
