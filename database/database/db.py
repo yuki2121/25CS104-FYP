@@ -2,49 +2,53 @@ import psycopg2
 import json
 import os
 from dotenv import load_dotenv
+from .storage_signer import sign_image_url
+from psycopg2.pool import ThreadedConnectionPool
 
 load_dotenv()
 
-DATABASE_NAME = os.getenv("DATABASE_NAME")
-DATABASE_USER = os.getenv("DATABASE_USER")
-DATABASE_PASSWORD = os.getenv("DATABASE_PASSWORD")
-DATABASE_HOST = os.getenv("DATABASE_HOST")
-DATABASE_PORT = os.getenv("DATABASE_PORT")
+DATABASE_URL = os.getenv("DATABASE_URL")
 
+DATABASE_URL = os.getenv("DATABASE_URL")
+if not DATABASE_URL:
+    raise RuntimeError("DATABASE_URL is not set")
 
-class DBManager:
-    def __init__(self, db_name=DATABASE_NAME, user=DATABASE_USER, password=DATABASE_PASSWORD, host=DATABASE_HOST, port=DATABASE_PORT):
-        self.conn = psycopg2.connect(
-            dbname=db_name,
-            user=user,
-            password=password,
-            host=host,
-            port=port
-        )
-        self.cursor = self.conn.cursor()
-
-    def commit(self):
-        self.conn.commit()
-
-    def close(self):
-        self.cursor.close()
-        self.conn.close()
-
-    def rollback(self):
-        self.conn.rollback()
-# TODO: add sql file too (restructure and obsolete 2d?)
-db_manager = DBManager()
+db_pool = ThreadedConnectionPool(
+    minconn=1,
+    maxconn=5,
+    dsn=DATABASE_URL,
+)
 
 def insert_image(path):
-    query = "INSERT INTO image (path) VALUES (%s) ON CONFLICT (path) DO NOTHING;"
-    db_manager.cursor.execute(query, (path,))
-    db_manager.commit()
+    conn = db_pool.getconn()
+    close_conn = False
+    try:
+        with conn.cursor() as cursor:
+            query = "INSERT INTO image (path) VALUES (%s) ON CONFLICT (path) DO NOTHING;"
+            cursor.execute(query, (path,))
+        conn.commit()
+    except Exception as e:
+        conn.rollback()
+        close_conn = True
+        raise e
+    finally:
+        db_pool.putconn(conn, close=close_conn)
 
 def get_image_id(path):
-    query = "SELECT image_id FROM image WHERE path = %s;"
-    db_manager.cursor.execute(query, (path,))
-    result = db_manager.cursor.fetchone()
-    return result[0] if result else None
+    conn = db_pool.getconn()
+    close_conn = False
+    try:
+        with conn.cursor() as cursor:
+            query = "SELECT image_id FROM image WHERE path = %s;"
+            cursor.execute(query, (path,))
+            result = cursor.fetchone()
+            return result[0] if result else None
+    except Exception as e:
+        conn.rollback()
+        close_conn = True
+        raise e
+    finally:
+        db_pool.putconn(conn, close=close_conn)
 
 def  insert_pose(pose_data):
     image_id = pose_data["image_id"]
@@ -58,7 +62,7 @@ def  insert_pose(pose_data):
 
 
     query = """
-    INSERT INTO poses_2d (image_id, pose_json, bbox_top_x, bbox_top_y, bbox_bottom_x, bbox_bottom_y, person_num, norm_joint)
+    INSERT INTO poses (image_id, pose_json, bbox_top_x, bbox_top_y, bbox_bottom_x, bbox_bottom_y, person_num, norm_joint)
     VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
     on conflict (image_id, person_num)
     do update set pose_json = EXCLUDED.pose_json,
@@ -69,8 +73,18 @@ def  insert_pose(pose_data):
                 norm_joint = EXCLUDED.norm_joint
     ;
     """
-    db_manager.cursor.execute(query, (image_id, pose_json, bbox_top_x, bbox_top_y, bbox_bottom_x, bbox_bottom_y, person_num, norm_joint))
-    db_manager.commit()
+    conn = db_pool.getconn()
+    close_conn = False
+    try:
+        with conn.cursor() as cursor:
+            cursor.execute(query, (image_id, pose_json, bbox_top_x, bbox_top_y, bbox_bottom_x, bbox_bottom_y, person_num, norm_joint))
+        conn.commit()
+    except Exception as e:
+        conn.rollback()
+        close_conn = True
+        raise e
+    finally:
+        db_pool.putconn(conn, close=close_conn)
 
 
 
@@ -82,67 +96,97 @@ def insert_pose_vector(pose_vector_data):
     person_num = pose_vector_data["person_num"]
 
     query = """
-    INSERT INTO poses_2d (image_id, pose_vec, person_num)
+    INSERT INTO poses (image_id, pose_vec, person_num)
     VALUES (%s, %s, %s)
     on conflict (image_id, person_num)
     do update set pose_vec = EXCLUDED.pose_vec;
     """
-    db_manager.cursor.execute(query, (image_id, pose_vector.tolist(), person_num))
-    db_manager.commit()
+    conn = db_pool.getconn()
+    close_conn = False
+    try:
+        with conn.cursor() as cursor:
+            cursor.execute(query, (image_id, pose_vector.tolist(), person_num))
+        conn.commit()
+    except Exception as e:
+        conn.rollback()
+        close_conn = True
+        raise e
+    finally:
+        db_pool.putconn(conn, close=close_conn)
 
 
 
 
 def get_result(vec, limit=20, offset=0):
-    db_manager.cursor.execute("SET hnsw.ef_search = 200;")
-    db_manager.cursor.execute("SET hnsw.iterative_scan = strict_order;")
+    conn = db_pool.getconn()
+    close_conn = False
+    try:
+        veclist = vec.tolist()
+        vecstr = "[" + ",".join(map(str, veclist)) + "]"
 
-    query = """
-    SELECT
-        p.poses_id,
-        p3d.pose_vec <=> (%s)::vector AS dist,
-        i.path,
-        p.bbox_top_x, p.bbox_top_y, p.bbox_bottom_x, p.bbox_bottom_y
-        FROM poses_2d p, image i, poses_3d p3d
-        WHERE p.image_id = i.image_id
-        and p.poses_id = p3d.pose_2d_id
+        query = """
+        SELECT
+            p.poses_id,
+            p.pose_vec <=> (%s)::vector AS dist,
+            p.bbox_top_x, p.bbox_top_y, p.bbox_bottom_x, p.bbox_bottom_y
+        FROM poses p
+        JOIN image i ON p.image_id = i.image_id
         ORDER BY dist
         LIMIT %s OFFSET %s;
-    """
-    veclist = vec.tolist()
-    vecstr = "[" + ",".join(map(str, veclist)) + "]"
-    db_manager.cursor.execute(query, (vecstr, limit, offset))
-    
-    results = db_manager.cursor.fetchall()
-    topk = []
+        """
 
-    for row in results:
-        pose_id,_, path, bbox_top_x, bbox_top_y, bbox_bottom_x, bbox_bottom_y = row
+        with conn.cursor() as cursor:
+            cursor.execute("SET hnsw.ef_search = 200;")
+            cursor.execute("SET hnsw.iterative_scan = strict_order;")
+            cursor.execute(query, (vecstr, limit, offset))
+            results = cursor.fetchall()
 
-        topk.append({
-            "pose_id": str(pose_id),
-            "url": path,
-            "bbox_top_x": bbox_top_x,
-            "bbox_top_y": bbox_top_y,
-            "bbox_bottom_x": bbox_bottom_x,
-            "bbox_bottom_y": bbox_bottom_y,
-        })
-    return topk
+        topk = []
+        for row in results:
+            pose_id, _, bbox_top_x, bbox_top_y, bbox_bottom_x, bbox_bottom_y = row
+            object_name = f"thumbs/{pose_id}.jpg"
+            # signed_url = sign_image_url(object_name)
+            topk.append({
+                "pose_id": str(pose_id),
+                "url": object_name,
+                "bbox_top_x": bbox_top_x,
+                "bbox_top_y": bbox_top_y,
+                "bbox_bottom_x": bbox_bottom_x,
+                "bbox_bottom_y": bbox_bottom_y,
+            })
+        return topk
 
+    except Exception as e:
+        conn.rollback()
+        close_conn = True
+        raise e
+    finally:
+        db_pool.putconn(conn, close=close_conn)
+        
+        
+        
 def get_all_image_bbox():
     query = """
     SELECT
         p.poses_id,
         i.path,
         p.bbox_top_x, p.bbox_top_y, p.bbox_bottom_x, p.bbox_bottom_y
-        FROM poses_2d p, image i
+        FROM poses p, image i
         WHERE p.image_id = i.image_id;
     """
-    db_manager.cursor.execute(query)
-    
-    results = db_manager.cursor.fetchall()
-
-    return results
+    conn = db_pool.getconn()
+    close_conn = False
+    try:
+        with conn.cursor() as cursor:
+            cursor.execute(query)
+            results = cursor.fetchall()
+        return results
+    except Exception as e:
+        conn.rollback()
+        close_conn = True
+        raise e
+    finally:
+        db_pool.putconn(conn, close=close_conn)
 
 
 def get_all_2d_poses():
@@ -150,13 +194,23 @@ def get_all_2d_poses():
     SELECT
         p.poses_id,
         p.pose_json
-        FROM poses_2d p;
+        FROM poses p;
     """
-    db_manager.cursor.execute(query)
+    conn = db_pool.getconn()
+    close_conn = False
+    try:
+        with conn.cursor() as cursor:
+            cursor.execute(query)
+            results = cursor.fetchall()
+        return results
+    except Exception as e:
+        conn.rollback()
+        close_conn = True
+        raise e
+    finally:
+        db_pool.putconn(conn, close=close_conn)
     
-    results = db_manager.cursor.fetchall()
 
-    return results
 
 def insert_pose_3d_vector(pose_2d_id, pose_vector):
     query = """
@@ -165,7 +219,17 @@ def insert_pose_3d_vector(pose_2d_id, pose_vector):
     on conflict (pose_2d_id)
     do update set pose_vec = EXCLUDED.pose_vec;
     """
-    db_manager.cursor.execute(query, (pose_2d_id, pose_vector.tolist()))
-    db_manager.commit()
+    conn = db_pool.getconn()
+    close_conn = False
+    try:
+        with conn.cursor() as cursor:
+            cursor.execute(query, (pose_2d_id, pose_vector.tolist()))
+        conn.commit()
+    except Exception as e:
+        conn.rollback()
+        close_conn = True
+        raise e
+    finally:
+        db_pool.putconn(conn, close=close_conn)
 
 

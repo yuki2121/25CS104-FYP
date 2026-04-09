@@ -4,30 +4,36 @@ from .schemas import PoseSearchRequest, PoseSearchResponse
 from shared.keypoints_manipulation import normalize_coco18_3d, pose_3d_to_vector
 from database.db import  get_result
 import hashlib, numpy as np
-
+from fastapi import HTTPException
 from fastapi.staticfiles import StaticFiles
 from pathlib import Path
-
+from fastapi.responses import StreamingResponse
+from google.cloud import storage
 import os
 from dotenv import load_dotenv
+from google.api_core.exceptions import NotFound
+
+import io
+import mimetypes
 
 load_dotenv()
 
-DATASET_DIR = os.getenv("IMAGE_DATASET_PATH") 
+
 DATABASE_URL = os.getenv("DATABASE_URL")
+FRONTEND_URL = os.getenv("FRONTEND_URL")
 
 app = FastAPI()
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[DATABASE_URL], 
+    allow_origins=[FRONTEND_URL],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-app.mount("/dataset", StaticFiles(directory=str(DATASET_DIR)), name="dataset") 
-print(f"Mounted /dataset to {DATASET_DIR}")
+GCS_BUCKET = os.getenv("GCS_BUCKET")
+storage_client = storage.Client()
 
 @app.get("/api/health")
 def health():
@@ -42,3 +48,24 @@ def search_pose(req: PoseSearchRequest):
 
     return {"topK": topk}
 
+@app.get("/api/image/{object_path:path}")
+def get_image(object_path: str):
+    bucket = storage_client.bucket(GCS_BUCKET)
+    blob = bucket.blob(object_path)
+
+    try:
+        data = blob.download_as_bytes()
+    except NotFound:
+        raise HTTPException(status_code=404, detail="Image not found")
+
+    content_type = (
+        blob.content_type
+        or mimetypes.guess_type(object_path)[0]
+        or "application/octet-stream"
+    )
+
+    return StreamingResponse(
+        io.BytesIO(data),
+        media_type=content_type,
+        headers={"Cache-Control": "public, max-age=3600"},
+    )

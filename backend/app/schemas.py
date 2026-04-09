@@ -8,7 +8,6 @@ class SearchResult(BaseModel):
     bbox_top_y: float
     bbox_bottom_x: float
     bbox_bottom_y: float
-    mpjpe: Optional[float] = None
 
 class PoseSearchResponse(BaseModel):
     topK: List[SearchResult]

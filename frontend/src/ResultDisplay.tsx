@@ -5,7 +5,8 @@ import { camera, skeleton } from "./PoseEditorCanvas";
 import "./ResultDisplay.css";
 
 const API_BASE = import.meta.env.VITE_API_BASE;
-const PAGE_SIZE = 30;
+const VITE_IMAGE_BASE_URL = import.meta.env.VITE_IMAGE_BASE_URL;
+const PAGE_SIZE = 25;
 
 type SearchPayload = {
 	format: string;
@@ -34,7 +35,7 @@ async function fetchSearchResults(
 	limit: number,
 	offset: number,
 ): Promise<ResultItem[]> {
-	const res = await fetch("/api/search", {
+	const res = await fetch(`${API_BASE}/api/search`, {
 		method: "POST",
 		headers: { "Content-Type": "application/json" },
 		body: JSON.stringify({
@@ -211,8 +212,8 @@ function ResultDisplay() {
 								<div key={r.pose_id} className="result-card">
 									{r.url && (
 										<img
-											src={`${API_BASE}/dataset/thumbs/${r.pose_id}.jpg`}
-											loading="eager"
+											src={`${VITE_IMAGE_BASE_URL}${r.url}`}
+											loading="lazy"
 											style={{
 												width: "100%",
 												display: "block",

@@ -1,0 +1,7 @@
+fastapi
+uvicorn[standard]
+pydantic
+numpy
+python-dotenv
+psycopg2-binary
+google-cloud-storage

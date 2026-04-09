@@ -1,0 +1,39 @@
+{
+  "schema_version": "1.0",
+  "joint_set": "COCO-18",
+  "joint_order": [
+    "Nose",
+    "Neck",
+    "RShoulder",
+    "RElbow",
+    "RWrist",
+    "LShoulder",
+    "LElbow",
+    "LWrist",
+    "RHip",
+    "RKnee",
+    "RAnkle",
+    "LHip",
+    "LKnee",
+    "LAnkle",
+    "REye",
+    "LEye",
+    "REar",
+    "LEar"
+  ],
+  "pelvis_joint": "HipCenter(derived)",
+  "pelvis_rule": "average(LHip, RHip) if both conf>=0.1; else use the available hip; else fallback to mean of valid joints",
+  "scale_joint": "Neck",
+  "scale_rule": "distance(pelvis, Neck) if both conf>=0.1; else no scaling (scale=1)",
+  "left_right_pairs": [
+    ["LShoulder", "RShoulder"],
+    ["LElbow", "RElbow"],
+    ["LWrist", "RWrist"],
+    ["LHip", "RHip"],
+    ["LKnee", "RKnee"],
+    ["LAnkle", "RAnkle"],
+    ["LEye", "REye"],
+    ["LEar", "REar"]
+  ],
+  "notes": "Mid Pelvis is derived from LHip and RHip for normalization."
+}
