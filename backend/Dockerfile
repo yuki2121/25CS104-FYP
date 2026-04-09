@@ -1,18 +1,16 @@
-# Select a base image that includes Python
 FROM python:3.8-slim
 
-# Set up a working directory in the container for your application
 WORKDIR /app
 
-# Copy the backend code into the container
-COPY . /app
+COPY backend/app/requirements.txt /app/requirements.txt
+RUN pip install --no-cache-dir -r /app/requirements.txt
 
-# Install any Python dependencies listed in 'requirements.txt'
-RUN pip install --no-cache-dir -r app/requirements.txt
+COPY backend/app /app/app
+COPY shared /app/shared
+COPY database /app/database
 
-# Expose the port the app runs on
-EXPOSE 5000
+ENV PYTHONUNBUFFERED=1
 
-# Set the command to run your application
-# (Be sure to replace './your_app_script.py' with the relative path to the Python file that starts your application)
-CMD ["python", "./app/main.py"]
+EXPOSE 8080
+
+CMD sh -c "uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8080}"
