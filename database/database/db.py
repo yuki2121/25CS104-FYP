@@ -92,7 +92,6 @@ def get_result(vec, limit=20, offset=0):
     SELECT
         p.poses_id,
         p.pose_vec <=> (%s)::vector AS dist,
-        i.path,
         p.bbox_top_x, p.bbox_top_y, p.bbox_bottom_x, p.bbox_bottom_y
         FROM poses p, image i
         WHERE p.image_id = i.image_id
@@ -107,11 +106,10 @@ def get_result(vec, limit=20, offset=0):
     topk = []
 
     for row in results:
-        pose_id,_, path, bbox_top_x, bbox_top_y, bbox_bottom_x, bbox_bottom_y = row
+        pose_id,_, bbox_top_x, bbox_top_y, bbox_bottom_x, bbox_bottom_y = row
 
         topk.append({
             "pose_id": str(pose_id),
-            "url": path,
             "bbox_top_x": bbox_top_x,
             "bbox_top_y": bbox_top_y,
             "bbox_bottom_x": bbox_bottom_x,

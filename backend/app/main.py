@@ -13,7 +13,7 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-DATASET_DIR = os.getenv("IMAGE_DATASET_PATH") 
+
 DATABASE_URL = os.getenv("DATABASE_URL")
 
 app = FastAPI()
@@ -26,8 +26,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-app.mount("/thumbs", StaticFiles(directory=str(DATASET_DIR)), name="thumbs") 
-print(f"Mounted /thumbs to {DATASET_DIR}")
+
 
 @app.get("/api/health")
 def health():
