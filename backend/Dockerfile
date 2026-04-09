@@ -6,7 +6,7 @@ COPY backend/app/requirements.txt /app/requirements.txt
 RUN pip install --no-cache-dir -r /app/requirements.txt
 
 COPY backend/app /app/app
-COPY shared /app/shared
+COPY shared/shared /app/shared
 COPY database /app/database
 
 ENV PYTHONUNBUFFERED=1
