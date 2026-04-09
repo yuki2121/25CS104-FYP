@@ -26,8 +26,8 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-app.mount("/dataset", StaticFiles(directory=str(DATASET_DIR)), name="dataset") 
-print(f"Mounted /dataset to {DATASET_DIR}")
+app.mount("/thumbs", StaticFiles(directory=str(DATASET_DIR)), name="thumbs") 
+print(f"Mounted /thumbs to {DATASET_DIR}")
 
 @app.get("/api/health")
 def health():
