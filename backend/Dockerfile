@@ -15,4 +15,4 @@ EXPOSE 5000
 
 # Set the command to run your application
 # (Be sure to replace './your_app_script.py' with the relative path to the Python file that starts your application)
-CMD ["python", "./app/main.py"]
+CMD ["python", "./main.py"]
