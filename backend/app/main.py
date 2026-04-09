@@ -15,17 +15,17 @@ load_dotenv()
 
 
 DATABASE_URL = os.getenv("DATABASE_URL")
+FRONTEND_URL = os.getenv("FRONTEND_URL")
 
 app = FastAPI()
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[DATABASE_URL], 
+    allow_origins=[FRONTEND_URL],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
 
 
 @app.get("/api/health")
