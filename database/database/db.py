@@ -129,7 +129,7 @@ def get_result(vec, limit=20, offset=0):
             p.poses_id,
             p.pose_vec <=> (%s)::vector AS dist,
             p.bbox_top_x, p.bbox_top_y, p.bbox_bottom_x, p.bbox_bottom_y
-        FROM poses_2d p
+        FROM poses p
         JOIN image i ON p.image_id = i.image_id
         ORDER BY dist
         LIMIT %s OFFSET %s;
