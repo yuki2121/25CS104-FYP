@@ -62,7 +62,7 @@ def  insert_pose(pose_data):
 
 
     query = """
-    INSERT INTO poses_2d (image_id, pose_json, bbox_top_x, bbox_top_y, bbox_bottom_x, bbox_bottom_y, person_num, norm_joint)
+    INSERT INTO poses (image_id, pose_json, bbox_top_x, bbox_top_y, bbox_bottom_x, bbox_bottom_y, person_num, norm_joint)
     VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
     on conflict (image_id, person_num)
     do update set pose_json = EXCLUDED.pose_json,
@@ -96,7 +96,7 @@ def insert_pose_vector(pose_vector_data):
     person_num = pose_vector_data["person_num"]
 
     query = """
-    INSERT INTO poses_2d (image_id, pose_vec, person_num)
+    INSERT INTO poses (image_id, pose_vec, person_num)
     VALUES (%s, %s, %s)
     on conflict (image_id, person_num)
     do update set pose_vec = EXCLUDED.pose_vec;
@@ -121,32 +121,30 @@ def get_result(vec, limit=20, offset=0):
     conn = db_pool.getconn()
     close_conn = False
     try:
-        with conn.cursor() as cursor:
-            cursor.execute("SET hnsw.ef_search = 200;")
-            cursor.execute("SET hnsw.iterative_scan = strict_order;")
+        veclist = vec.tolist()
+        vecstr = "[" + ",".join(map(str, veclist)) + "]"
 
         query = """
         SELECT
             p.poses_id,
             p.pose_vec <=> (%s)::vector AS dist,
             p.bbox_top_x, p.bbox_top_y, p.bbox_bottom_x, p.bbox_bottom_y
-            FROM poses p, image i
-            WHERE p.image_id = i.image_id
-            ORDER BY dist
-            LIMIT %s OFFSET %s;
+        FROM poses_2d p
+        JOIN image i ON p.image_id = i.image_id
+        ORDER BY dist
+        LIMIT %s OFFSET %s;
         """
-        veclist = vec.tolist()
-        vecstr = "[" + ",".join(map(str, veclist)) + "]"
-        cursor.execute(query, (vecstr, limit, offset))
-        
-        results = cursor.fetchall()
+
+        with conn.cursor() as cursor:
+            cursor.execute("SET hnsw.ef_search = 200;")
+            cursor.execute("SET hnsw.iterative_scan = strict_order;")
+            cursor.execute(query, (vecstr, limit, offset))
+            results = cursor.fetchall()
+
         topk = []
-
         for row in results:
-            pose_id,_, bbox_top_x, bbox_top_y, bbox_bottom_x, bbox_bottom_y = row
+            pose_id, _, bbox_top_x, bbox_top_y, bbox_bottom_x, bbox_bottom_y = row
             object_name = f"thumbs/{pose_id}.jpg"
-            # signed_url = sign_image_url(object_name)
-
             topk.append({
                 "pose_id": str(pose_id),
                 "url": f"/api/image/{object_name}",
@@ -156,20 +154,23 @@ def get_result(vec, limit=20, offset=0):
                 "bbox_bottom_y": bbox_bottom_y,
             })
         return topk
+
     except Exception as e:
         conn.rollback()
         close_conn = True
         raise e
     finally:
         db_pool.putconn(conn, close=close_conn)
-
+        
+        
+        
 def get_all_image_bbox():
     query = """
     SELECT
         p.poses_id,
         i.path,
         p.bbox_top_x, p.bbox_top_y, p.bbox_bottom_x, p.bbox_bottom_y
-        FROM poses_2d p, image i
+        FROM poses p, image i
         WHERE p.image_id = i.image_id;
     """
     conn = db_pool.getconn()
@@ -192,7 +193,7 @@ def get_all_2d_poses():
     SELECT
         p.poses_id,
         p.pose_json
-        FROM poses_2d p;
+        FROM poses p;
     """
     conn = db_pool.getconn()
     close_conn = False
