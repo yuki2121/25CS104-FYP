@@ -145,10 +145,10 @@ def get_result(vec, limit=20, offset=0):
         for row in results:
             pose_id, _, bbox_top_x, bbox_top_y, bbox_bottom_x, bbox_bottom_y = row
             object_name = f"thumbs/{pose_id}.jpg"
-            # signed_url = sign_image_url(object_name)
+            signed_url = sign_image_url(object_name)
             topk.append({
                 "pose_id": str(pose_id),
-                "url": object_name,
+                "url": signed_url,
                 "bbox_top_x": bbox_top_x,
                 "bbox_top_y": bbox_top_y,
                 "bbox_bottom_x": bbox_bottom_x,
