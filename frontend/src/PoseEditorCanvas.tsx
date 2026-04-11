@@ -288,7 +288,7 @@ function PoseEditorCanvas() {
             gltf.scene.updateMatrixWorld(true);
 
             //set default bone positions
-            skeleton.bones.forEach( (b,i) => {
+            skeleton.bones.forEach( (b) => {
                 const bone = skeleton!.getBoneByName(b.name);
                 if (bone) {
                     const rot = new THREE.Quaternion();
