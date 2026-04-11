@@ -4,7 +4,6 @@
 /shared/__pycache__
 /estimation-model/__pycache__
 /database/__pycache__
-*.json
 *.pyc
 .env
 database/fyp_database.egg-info/
