@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect } from 'react'
 import * as THREE from 'three';
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
@@ -71,7 +71,7 @@ function PoseEditorCanvas() {
             // rotate from last link back to first
             for (let i = links.length - 1; i >= 0; i--) {
                 const bone = links[i];
-                const next = (i === links.length - 1) ? effector : links[i + 1];
+                // const next = (i === links.length - 1) ? effector : links[i + 1];
 
                 bone.getWorldPosition(bonePos);
                 effector.getWorldPosition(effPos);
@@ -246,6 +246,8 @@ function PoseEditorCanvas() {
                 updateAllSpritePositions();
             }
 
+            if (!camera || !cameraControls) return;
+
             cameraControls.update();
             Dlight.position.copy(camera.position).normalize();
             renderer.render(scene, camera);
@@ -271,7 +273,7 @@ function PoseEditorCanvas() {
             //find skinned mesh
             const skinned: THREE.SkinnedMesh[] = [];
             
-            gltf.scene.traverse((obj)=> {
+            gltf.scene.traverse((obj: any)=> {
                 if ((obj as any).isSkinnedMesh) skinned.push(obj as THREE.SkinnedMesh);
             });
             console.log("skinned meshes:", skinned);
@@ -301,6 +303,7 @@ function PoseEditorCanvas() {
             const dragIcon = textureLoader.load( '/icons8-circle-48-2.png' );
 
             bones.forEach( (boneName) => {
+                if (!skeleton) return;
                 const bone = skeleton.getBoneByName(boneName);
                 const sprite = new THREE.Sprite(new THREE.SpriteMaterial( { map: dragIcon, transparent: true, depthTest: false, opacity: 0.6 } ));
 
@@ -336,6 +339,7 @@ function PoseEditorCanvas() {
 
             function onPointerDown(e: PointerEvent) {
                 updateMouseNDC(e);
+                if (!camera) return;
                 raycaster.setFromCamera(mouse, camera);
 
                 const hits = raycaster.intersectObjects(sprites, false);
@@ -356,7 +360,7 @@ function PoseEditorCanvas() {
             }
 
             function onPointerMove(e: PointerEvent) {
-                if (!dragging || !selectedSprite) return;
+                if (!dragging || !selectedSprite || !camera) return;
 
                 updateMouseNDC(e);
                 raycaster.setFromCamera(mouse, camera);
@@ -400,13 +404,14 @@ function PoseEditorCanvas() {
 
             // map sprite to IK
             function getIKForSprite(sprite: THREE.Sprite) {
+                if (!skeleton) return null;
                 const effName = sprite.name.replace("_Control", "");
 
                 const chainNames = IK_CHAINS[effName];
                 if (!chainNames) return null;
 
                 const chainBones = chainNames
-                    .map(n => skeleton.getBoneByName(n))
+                    .map(n => skeleton!.getBoneByName(n))
                     .filter(Boolean) as THREE.Bone[];
 
                 if (chainBones.length < 2) return null;
