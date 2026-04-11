@@ -16,7 +16,7 @@ export default function Button({
   style,
 }: ButtonProps) {
   return (
-    <button type={type} onClick={onClick} className={className} style={style}>
+    <button type={type} onClick={onClick} className = {`rounded bg-blue-500 text-white hover:bg-purple-600 m-2 focus:outline-none focus:ring-2 ${className}`} style={style}>
       {label}
     </button>
   );
