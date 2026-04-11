@@ -468,7 +468,7 @@ function PoseEditorCanvas() {
                     label="Search Poses" 
                     onClick={handleSearchClick} 
                     className="bg-green-500" 
-                    style={{ width: '100%', height: '50px', fontWeight: 'bold', fontSize: '1.1rem' }} 
+                    // style={{ width: '100%', height: '50px', fontWeight: 'bold', fontSize: '1.1rem' }} 
                 />
             </div>
             <div style = {{ fontSize: '0.6rem', color: 'gray', marginTop: '5px' }}>
