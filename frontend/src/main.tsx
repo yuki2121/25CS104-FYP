@@ -19,6 +19,7 @@ createRoot(document.getElementById("root")!).render(
           padding: "10px",
           backgroundColor: "#fff", 
           zIndex: 10, 
+          textAlign: "center",
         }}
       >
         <PoseEditorCanvas />
@@ -27,7 +28,7 @@ createRoot(document.getElementById("root")!).render(
       <main
         id = "result-scroll-root"
         style={{
-          marginLeft: "530px", 
+          marginLeft: "550px", 
           height: "100vh", 
           overflowY: "auto",
           boxSizing: "border-box",
