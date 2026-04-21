@@ -307,7 +307,7 @@ def pose_3d_to_vector(keypoints, scores):
     vec = []
     for (x, y, z), s in zip(keypoints, scores):        
         vec.append(x)
-        vec.append(-y)
+        vec.append(y)
         vec.append(z)
         vec.append(s)
         
