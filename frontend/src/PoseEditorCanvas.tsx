@@ -52,32 +52,40 @@ function PoseEditorCanvas() {
     let resultDisplay = null;
 
     // IK Solver helper
-    function ccdSolve(links: THREE.Bone[], effector: THREE.Bone, targetWorld: THREE.Vector3, iterations = 12, eps = 5e-3) {
-        const bonePos = new THREE.Vector3();
+    function ccdSolve(
+        links: THREE.Bone[],
+        effector: THREE.Bone,
+        targetWorld: THREE.Vector3,
+        iterations = 12,
+        eps = 1e-3
+    ) {
+        const linkPos = new THREE.Vector3();
         const effPos = new THREE.Vector3();
+        const tgtPos = new THREE.Vector3();
+
+        const invLinkQ = new THREE.Quaternion();
+        const deltaQ = new THREE.Quaternion();
+
         const toEff = new THREE.Vector3();
         const toTgt = new THREE.Vector3();
         const axis = new THREE.Vector3();
 
-        const parentWorldQ = new THREE.Quaternion();
-        const invParentWorldQ = new THREE.Quaternion();
-        const worldDeltaQ = new THREE.Quaternion();
-        const localDeltaQ = new THREE.Quaternion();
-
         for (let it = 0; it < iterations; it++) {
             effector.getWorldPosition(effPos);
-            if (effPos.distanceToSquared(targetWorld) < eps) break;
+            if (effPos.distanceToSquared(targetWorld) < eps * eps) break;
 
-            // rotate from last link back to first
             for (let i = links.length - 1; i >= 0; i--) {
-                const bone = links[i];
-                // const next = (i === links.length - 1) ? effector : links[i + 1];
+                const link = links[i];
 
-                bone.getWorldPosition(bonePos);
+                link.getWorldPosition(linkPos);
+                link.getWorldQuaternion(invLinkQ).invert();
+
                 effector.getWorldPosition(effPos);
+                tgtPos.copy(targetWorld);
 
-                toEff.copy(effPos).sub(bonePos);
-                toTgt.copy(targetWorld).sub(bonePos);
+                // move vectors into link local rotation space
+                toEff.copy(effPos).sub(linkPos).applyQuaternion(invLinkQ);
+                toTgt.copy(tgtPos).sub(linkPos).applyQuaternion(invLinkQ);
 
                 const len1 = toEff.length();
                 const len2 = toTgt.length();
@@ -86,26 +94,26 @@ function PoseEditorCanvas() {
                 toEff.multiplyScalar(1 / len1);
                 toTgt.multiplyScalar(1 / len2);
 
-                let cos = toEff.dot(toTgt);
-                cos = Math.max(-1, Math.min(1, cos));
+                let cos = THREE.MathUtils.clamp(toEff.dot(toTgt), -1, 1);
                 const angle = Math.acos(cos);
                 if (angle < 1e-5) continue;
 
                 axis.crossVectors(toEff, toTgt);
-                if (axis.lengthSq() < 1e-10) continue;
+
+                // fallback when nearly parallel/opposite
+                if (axis.lengthSq() < 1e-10) {
+                    axis.set(1, 0, 0).cross(toEff);
+                    if (axis.lengthSq() < 1e-10) axis.set(0, 1, 0).cross(toEff);
+                }
+
                 axis.normalize();
+                deltaQ.setFromAxisAngle(axis, angle);
 
-                worldDeltaQ.setFromAxisAngle(axis, angle);
+                // apply in local space
+                link.quaternion.multiply(deltaQ);
+                link.quaternion.normalize();
 
-                bone.parent?.getWorldQuaternion(parentWorldQ) ?? parentWorldQ.identity();
-                invParentWorldQ.copy(parentWorldQ).invert();
-
-                localDeltaQ.copy(invParentWorldQ).multiply(worldDeltaQ).multiply(parentWorldQ);
-
-                bone.quaternion.premultiply(localDeltaQ);
-                bone.updateMatrixWorld(true);
-
-
+                link.updateMatrixWorld(true);
             }
         }
     }
